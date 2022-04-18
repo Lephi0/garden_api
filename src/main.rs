@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use chrono::prelude::*;
 use tokio::{task, time};
 use once_cell::sync::Lazy;
 use reqwest::Error;
@@ -30,6 +31,8 @@ static CONFIG: Lazy<AppConfig> = Lazy::new(|| {
 
 static WAIT_FOR_SEC: u64 = 10;
 static LUX_THRESHOLD: u32 = 1000;
+static SEVEN_AM: u32 = 7;
+static TEN_PM: u32 = 22;
 
 #[tokio::main]
 async fn main() {
@@ -136,21 +139,42 @@ async fn toggle_led(lux_value: &u32) -> Result<(), Error> {
     // Toggle group action
     if group_id.is_some() {
         let group_id = group_id.unwrap();
-        let group_state = client::get::<Group>(format!("/groups/{group_id}")).await?;
-        
-        // Switch light only when it is not only in that state (if lux > 1000 and it is not already turned on)
-        if *lux_value > LUX_THRESHOLD && group_state.state.all_on == true {
+        let group = client::get::<Group>(format!("/groups/{group_id}")).await?;
+
+        // Turn the light on only in a specific timeframe.
+        if is_in_timeframe() {
+            // Switch light only when it is not only in that state (if lux > 1000 and it is not already turned on)
+            if *lux_value > LUX_THRESHOLD && group.state.all_on == true {
+                switch_light_on(group_id, false).await?;
+            } else if *lux_value < LUX_THRESHOLD && group.state.all_on == false {
+                switch_light_on(group_id, true).await?;
+            }
+        } else if group.state.all_on == true {
             switch_light_on(group_id, false).await?;
-        } else if *lux_value < LUX_THRESHOLD && group_state.state.all_on == false {
-            switch_light_on(group_id, true).await?;
         }
     }
 
     Ok(())
 }
 
+fn is_in_timeframe() -> bool {
+    let now: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
+
+    let seven_am = Utc.ymd(now.year(), now.month(), now.day()).and_hms(13, 23, 0);
+    let ten_pm = Utc.ymd(now.year(), now.month(), now.day()).and_hms(TEN_PM, 0, 0);
+
+    if now > seven_am && now < ten_pm {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+/**
+ * Sets the group action on to true or false.
+ */
 async fn switch_light_on(group_id: String, on: bool) -> Result<(), Error> {
-    println!(" - Switching: {} - ", on);
+    println!(" - Switching on: {} - ", on);
     let mut action: HashMap<String, bool> = HashMap::new();
     action.insert("on".to_string(), on);
 
