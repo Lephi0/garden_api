@@ -29,7 +29,7 @@ static CONFIG: Lazy<AppConfig> = Lazy::new(|| {
     config
 });
 
-static WAIT_FOR_SEC: u64 = 10;
+static SENSOR_UPDATE_INTERVAL_SEC: u64 = 15;
 static LUX_THRESHOLD: u32 = 1000;
 static SEVEN_AM: u32 = 7;
 static TEN_PM: u32 = 22;
@@ -37,7 +37,7 @@ static TEN_PM: u32 = 22;
 #[tokio::main]
 async fn main() {
     let forever = task::spawn(async {
-        let mut interval = time::interval(Duration::from_secs(WAIT_FOR_SEC));
+        let mut interval = time::interval(Duration::from_secs(SENSOR_UPDATE_INTERVAL_SEC));
 
         loop {
             let mut lux_value = 0;
@@ -160,7 +160,7 @@ async fn toggle_led(lux_value: &u32) -> Result<(), Error> {
 fn is_in_timeframe() -> bool {
     let now: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
 
-    let seven_am = Utc.ymd(now.year(), now.month(), now.day()).and_hms(13, 23, 0);
+    let seven_am = Utc.ymd(now.year(), now.month(), now.day()).and_hms(SEVEN_AM, 0, 0);
     let ten_pm = Utc.ymd(now.year(), now.month(), now.day()).and_hms(TEN_PM, 0, 0);
 
     if now > seven_am && now < ten_pm {
